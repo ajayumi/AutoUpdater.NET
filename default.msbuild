@@ -17,7 +17,7 @@
 
   <Target Name="Run">
     <CallTarget Targets="Compile" />
-    <CallTarget Targets="Deploy_App" />
+    <!-- <CallTarget Targets="Deploy_App" /> -->
     <!--<CallTarget Targets="Deploy_nugetServer" />-->
   </Target>
 
@@ -32,15 +32,15 @@
 
   <Target Name="Compile" DependsOnTargets="Init">
 	<Exec Command="$(nuget) restore @(SolutionToBuild)" />
-	<MSBuild Projects="@(SolutionToBuild)" Properties="Configuration=$(Configuration);Version=$(TargetFrameworkVersion);SolutionDir=E:\Projects\github\ajayumi\AutoUpdater.NET\" />
+	<MSBuild Projects="@(SolutionToBuild)" Properties="Configuration=$(Configuration);Version=$(TargetFrameworkVersion);" />
   </Target>
 
-  <Target Name="Deploy_App" DependsOnTargets="Compile">
+  <!-- <Target Name="Deploy_App" DependsOnTargets="Compile">
     <Message Text="发布$(appname)项目"/>
 	<Exec Command="xcopy &quot;AutoUpdater.NET\bin\$(Configuration)\*&quot; &quot;$(outputdir)\$(appname)\&quot; /R /Y /I /S" />
-  </Target>
+  </Target> -->
 
-  <Target Name="Deploy_nugetServer" DependsOnTargets="Deploy_App">
+  <!-- <Target Name="Deploy_nugetServer" DependsOnTargets="Deploy_App">
     <Exec Command="$(nuget) push $(outputdir)\$(appname)\ajayumi.develop.CSharp.Data.*.nupkg ajayumi13584089910 -Source http://www.ajayumi.com:5555/nuget" />
-  </Target>
+  </Target> -->
 </Project>
