@@ -229,17 +229,17 @@ namespace AutoUpdaterDotNET
             Start(AppCastURL, false, myAssembly);
         }
 
-        /// <summary>
-        ///     Start checking for new version of application via FTP and display dialog to the user if update is available.
-        /// </summary>
-        /// <param name="appCast">FTP URL of the xml file that contains information about latest version of the application.</param>
-        /// <param name="ftpCredentials">Credentials required to connect to FTP server.</param>
-        /// <param name="myAssembly">Assembly to use for version checking.</param>
-        public static void Start(String appCast, NetworkCredential ftpCredentials, Assembly myAssembly = null)
-        {
-            FtpCredentials = ftpCredentials;
-            Start(appCast, myAssembly);
-        }
+        ///// <summary>
+        /////     Start checking for new version of application via FTP and display dialog to the user if update is available.
+        ///// </summary>
+        ///// <param name="appCast">FTP URL of the xml file that contains information about latest version of the application.</param>
+        ///// <param name="ftpCredentials">Credentials required to connect to FTP server.</param>
+        ///// <param name="myAssembly">Assembly to use for version checking.</param>
+        //public static void Start(String appCast, NetworkCredential ftpCredentials, Assembly myAssembly = null)
+        //{
+        //    FtpCredentials = ftpCredentials;
+        //    Start(appCast, myAssembly);
+        //}
 
         /// <summary>
         ///     Start checking for new version of application and display dialog to the user if update is available.
