@@ -61,12 +61,21 @@ namespace AutoUpdaterDotNET
 
             if (ieValue != 0)
             {
-                using (RegistryKey registryKey =
-                    Registry.CurrentUser.OpenSubKey(
-                        @"SOFTWARE\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_BROWSER_EMULATION", true))
+                try
                 {
-                    registryKey?.SetValue(Path.GetFileName(Process.GetCurrentProcess().MainModule.FileName), ieValue,
-                        RegistryValueKind.DWord);
+                    using (RegistryKey registryKey =
+                        Registry.CurrentUser.OpenSubKey(
+                            @"SOFTWARE\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_BROWSER_EMULATION",
+                            true))
+                    {
+                        registryKey?.SetValue(Path.GetFileName(Process.GetCurrentProcess().MainModule.FileName),
+                            ieValue,
+                            RegistryValueKind.DWord);
+                    }
+                }
+                catch (Exception)
+                {
+                    // ignored
                 }
             }
         }
@@ -82,7 +91,14 @@ namespace AutoUpdaterDotNET
             }
             else
             {
-                webBrowser.Navigate(AutoUpdater.ChangelogURL);
+                if (null != AutoUpdater.BasicAuthChangeLog)
+                {
+                    webBrowser.Navigate(AutoUpdater.ChangelogURL, "", null, $"Authorization: {AutoUpdater.BasicAuthChangeLog}");
+                }
+                else
+                {
+                   webBrowser.Navigate(AutoUpdater.ChangelogURL);
+                }
             }
 
             var labelSize = new Size(Width - 110, 0);

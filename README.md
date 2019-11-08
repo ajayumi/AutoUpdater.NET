@@ -66,7 +66,7 @@ Start method of AutoUpdater class takes URL of the XML file you uploaded to serv
 
 ### Current version detection
 
-AutoUpdater.NET uses Assembly version to determine the current verison of the application. You can update it by going to Properties of the project as shown in following screenshot.
+AutoUpdater.NET uses Assembly version to determine the current version of the application. You can update it by going to Properties of the project as shown in following screenshot.
 
 ![How to change assembly version of your .NET application?](https://rbsoft.org/images/assembly-version.png)
 
@@ -79,6 +79,16 @@ AutoUpdater.Start("http://rbsoft.org/updates/AutoUpdaterTest.xml", myAssembly);
 ````
 
 ## Configuration Options
+
+### Download Update file and XML using FTP
+
+If you like to use ftp XML URL to check for updates or download the update file then you can provide you FTP credentials in alternative Start method as shown below.
+
+````csharp
+AutoUpdater.Start("ftp://rbsoft.org/updates/AutoUpdaterTest.xml", new NetworkCredential("FtpUserName", "FtpPassword"));
+````
+
+If you are using FTP download URL in the XML file then credentials provided here will be used to authenticate the request.
 
 ### Disable Skip Button
 
@@ -106,7 +116,7 @@ AutoUpdater.Mandatory = true;
 
 ### Forced updates
 
-You can enable forced updates by setting Mandatory property to true and setting UpdateMode to value of "Forced" or "ForceDownload". "Forced" option will hide Remind Later, Skip and Close buttons on the standard update dialog. "ForceDownload" option will skip the standard update dialog and start downloading and updating the application without user interaction. "ForceDownload" option will also ignore value of OpenDownloadPage flag.
+You can enable forced updates by setting Mandatory property to true and setting UpdateMode to value of `Mode.Forced` or `Mode.ForcedDownload`. `Mode.Forced` option will hide Remind Later, Skip and Close buttons on the standard update dialog. `Mode.ForcedDownload` option will skip the standard update dialog and start downloading and updating the application without user interaction. `Mode.ForceDownload` option will also ignore value of OpenDownloadPage flag.
 
 ````csharp
 AutoUpdater.Mandatory = true;
@@ -115,11 +125,19 @@ AutoUpdater.UpdateMode = Mode.Forced;
 
 ### Basic Authetication
 
-You can provide Basic Authetication for XML and Update file as shown in below code.
+You can provide Basic Authetication for XML, Update file and Change Log as shown in below code.
 
 ````csharp
 BasicAuthentication basicAuthentication = new BasicAuthentication("myUserName", "myPassword");
-AutoUpdater.BasicAuthXML = AutoUpdater.BasicAuthDownload = basicAuthentication;
+AutoUpdater.BasicAuthXML = AutoUpdater.BasicAuthDownload = AutoUpdater.BasicAuthChangeLog = basicAuthentication;
+````
+
+### Set User-Agent for http web requests
+	
+Set the User-Agent string to be used for HTTP web requests so you can differentiate them in your web server request logs.
+
+````csharp
+AutoUpdater.HttpUserAgent = "AutoUpdater";
 ````
 
 ### Enable Error Reporting
@@ -220,7 +238,7 @@ timer.Start();
 
 ## Handling Application exit logic manually
 
-If you like to handle Application exit logic yourself then you can use ApplicationExiEvent like below. This is very useful if you like to do something before closing the application.
+If you like to handle Application exit logic yourself then you can use ApplicationExitEvent like below. This is very useful if you like to do something before closing the application.
 
 ````csharp
 AutoUpdater.ApplicationExitEvent += AutoUpdater_ApplicationExitEvent;
@@ -269,7 +287,7 @@ private void AutoUpdaterOnCheckForUpdateEvent(UpdateInfoEventArgs args)
             // Uncomment the following line if you want to show standard update dialog instead.
             // AutoUpdater.ShowUpdateForm();
 
-            if (dialogResult.Equals(DialogResult.Yes))
+            if (dialogResult.Equals(DialogResult.Yes) || dialogResult.Equals(DialogResult.OK))
             {
                 try
                 {

@@ -103,6 +103,11 @@ namespace AutoUpdaterDotNET
         public static String AppCastURL;
 
         /// <summary>
+        /// Login/password/domain for FTP-request
+        /// </summary>
+        public static NetworkCredential FtpCredentials;
+
+        /// <summary>
         ///     Opens the download URL in default browser if true. Very usefull if you have portable application.
         /// </summary>
         public static bool OpenDownloadPage;
@@ -110,13 +115,23 @@ namespace AutoUpdaterDotNET
         /// <summary>
         ///     Set Basic Authentication credentials required to download the file.
         /// </summary>
-        public static BasicAuthentication BasicAuthDownload;
+        public static IAuthentication BasicAuthDownload;
 
         /// <summary>
         ///     Set Basic Authentication credentials required to download the XML file.
         /// </summary>
-        public static BasicAuthentication BasicAuthXML;
+        public static IAuthentication BasicAuthXML;
 
+        /// <summary>
+        ///     Set Basic Authentication credentials to navigate to the change log URL. 
+        /// </summary>
+        public static IAuthentication BasicAuthChangeLog;
+
+        /// <summary>
+        ///     Set the User-Agent string to be used for HTTP web requests.
+        /// </summary>
+        public static string HttpUserAgent;
+        
         /// <summary>
         ///     If this is true users can see the skip button.
         /// </summary>
@@ -212,6 +227,18 @@ namespace AutoUpdaterDotNET
         public static void Start(Assembly myAssembly = null)
         {
             Start(AppCastURL, false, myAssembly);
+        }
+
+        /// <summary>
+        ///     Start checking for new version of application via FTP and display dialog to the user if update is available.
+        /// </summary>
+        /// <param name="appCast">FTP URL of the xml file that contains information about latest version of the application.</param>
+        /// <param name="ftpCredentials">Credentials required to connect to FTP server.</param>
+        /// <param name="myAssembly">Assembly to use for version checking.</param>
+        public static void Start(String appCast, NetworkCredential ftpCredentials, Assembly myAssembly = null)
+        {
+            FtpCredentials = ftpCredentials;
+            Start(appCast, myAssembly);
         }
 
         /// <summary>
@@ -373,31 +400,59 @@ namespace AutoUpdaterDotNET
                 InstalledVersion = mainAssembly.GetName().Version;
             }
 
-            var webRequest = WebRequest.Create(AppCastURL);
-            if (BasicAuthXML != null)
-            {
-                webRequest.Headers[HttpRequestHeader.Authorization] = BasicAuthXML.ToString();
-            }
+            WebRequest webRequest = WebRequest.Create(AppCastURL);
 
-            webRequest.CachePolicy = new HttpRequestCachePolicy(HttpRequestCacheLevel.NoCacheNoStore);
+            webRequest.CachePolicy = new RequestCachePolicy(RequestCacheLevel.NoCacheNoStore);
+
             if (Proxy != null)
             {
                 webRequest.Proxy = Proxy;
             }
 
+            var uri = new Uri(AppCastURL);
+
             WebResponse webResponse;
 
             try
             {
-                webResponse = webRequest.GetResponse();
+                if (uri.Scheme.Equals(Uri.UriSchemeFtp))
+                {
+                    var ftpWebRequest = (FtpWebRequest) webRequest;
+                    ftpWebRequest.Credentials = FtpCredentials;
+                    ftpWebRequest.UseBinary = true;
+                    ftpWebRequest.UsePassive = true;
+                    ftpWebRequest.KeepAlive = true;
+                    ftpWebRequest.Method = WebRequestMethods.Ftp.DownloadFile;
+
+                    webResponse = ftpWebRequest.GetResponse();
+                }
+                else if(uri.Scheme.Equals(Uri.UriSchemeHttp) || uri.Scheme.Equals(Uri.UriSchemeHttps))
+                {
+                    HttpWebRequest httpWebRequest = (HttpWebRequest) webRequest;
+
+                    httpWebRequest.UserAgent = GetUserAgent();
+
+                    if (BasicAuthXML != null)
+                    {
+                        httpWebRequest.Headers[HttpRequestHeader.Authorization] = BasicAuthXML.ToString();
+                    }
+
+                    webResponse = httpWebRequest.GetResponse();
+                }
+                else
+                {
+                    webResponse = webRequest.GetResponse(); 
+                }
             }
-            catch (Exception)
+            catch (Exception exception)
             {
+                Debug.WriteLine(exception);
                 e.Cancel = false;
                 return;
             }
 
             UpdateInfoEventArgs args;
+
             using (Stream appCastStream = webResponse.GetResponseStream())
             {
                 if (appCastStream != null)
@@ -414,8 +469,7 @@ namespace AutoUpdaterDotNET
                     }
                     else
                     {
-                        XmlDocument receivedAppCastDocument = new XmlDocument();
-
+                        XmlDocument receivedAppCastDocument = new XmlDocument {XmlResolver = null};
                         try
                         {
                             receivedAppCastDocument.Load(appCastStream);
@@ -483,7 +537,7 @@ namespace AutoUpdaterDotNET
                                 }
                             }
                         }
-                        catch (XmlException)
+                        catch (Exception)
                         {
                             e.Cancel = false;
                             webResponse.Close();
@@ -666,6 +720,11 @@ namespace AutoUpdaterDotNET
             return (Attribute)attributes[0];
         }
 
+        internal static string GetUserAgent()
+        {
+            return string.IsNullOrEmpty(HttpUserAgent) ? $"AutoUpdater.NET" : HttpUserAgent;
+        }
+
         internal static void SetTimer(DateTime remindLater)
         {
             TimeSpan timeSpan = remindLater - DateTime.Now;
@@ -801,10 +860,18 @@ namespace AutoUpdaterDotNET
         }
     }
 
+
+    /// <summary>
+    ///     Interface for authentication
+    /// </summary>
+    public interface IAuthentication
+    {
+    }
+
     /// <summary>
     ///     Provides Basic Authentication header for web request.
     /// </summary>
-    public class BasicAuthentication
+    public class BasicAuthentication : IAuthentication
     {
         private string Username { get; }
 
@@ -826,6 +893,29 @@ namespace AutoUpdaterDotNET
         {
             var token = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{Username}:{Password}"));
             return $"Basic {token}";
+        }
+    }
+
+    /// <summary>
+    ///     Provides Custom Authentication header for web request.
+    /// </summary>
+    public class CustomAuthentication : IAuthentication
+    {
+        private string HttpRequestHeaderAuthorizationValue { get; }
+
+        /// <summary>
+        /// Initializes authorization header value for Custom Authentication
+        /// </summary>
+        /// <param name="httpRequestHeaderAuthorizationValue">Value to use as http request header authorization value</param>
+        public CustomAuthentication(string httpRequestHeaderAuthorizationValue)
+        {
+            HttpRequestHeaderAuthorizationValue = httpRequestHeaderAuthorizationValue;
+        }
+
+        /// <inheritdoc />
+        public override string ToString()
+        {
+            return HttpRequestHeaderAuthorizationValue;
         }
     }
 }

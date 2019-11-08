@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Net.Cache;
+using System.Net.Mime;
 using System.Security.Cryptography;
 using System.Text;
 using System.Windows.Forms;
@@ -36,17 +37,33 @@ namespace AutoUpdaterDotNET
 
         private void DownloadUpdateDialogLoad(object sender, EventArgs e)
         {
-            _webClient = new MyWebClient
+            var uri = new Uri(_downloadURL);
+            
+            if (uri.Scheme.Equals(Uri.UriSchemeFtp))
             {
-                CachePolicy = new HttpRequestCachePolicy(HttpRequestCacheLevel.NoCacheNoStore)
-            };
+                _webClient = new MyWebClient {Credentials = AutoUpdater.FtpCredentials};
+            }
+            else
+            {
+                _webClient = new MyWebClient();
+
+                if (uri.Scheme.Equals(Uri.UriSchemeHttp) || uri.Scheme.Equals(Uri.UriSchemeHttps))
+                {
+                    if (AutoUpdater.BasicAuthDownload != null)
+                    {
+                        _webClient.Headers[HttpRequestHeader.Authorization] = AutoUpdater.BasicAuthDownload.ToString();
+                    }
+
+                    _webClient.Headers[HttpRequestHeader.UserAgent] = AutoUpdater.GetUserAgent();
+                }
+            }
+
+            _webClient.CachePolicy = new RequestCachePolicy(RequestCacheLevel.NoCacheNoStore);
 
             if (AutoUpdater.Proxy != null)
             {
                 _webClient.Proxy = AutoUpdater.Proxy;
             }
-
-            var uri = new Uri(_downloadURL);
 
             if (string.IsNullOrEmpty(AutoUpdater.DownloadPath))
             {
@@ -59,11 +76,6 @@ namespace AutoUpdaterDotNET
                 {
                     Directory.CreateDirectory(AutoUpdater.DownloadPath);
                 }
-            }
-
-            if (AutoUpdater.BasicAuthDownload != null)
-            {
-                _webClient.Headers[HttpRequestHeader.Authorization] = AutoUpdater.BasicAuthDownload.ToString();
             }
 
             _webClient.DownloadProgressChanged += OnDownloadProgressChanged;
@@ -122,20 +134,15 @@ namespace AutoUpdaterDotNET
                 }
             }
 
-            string fileName;
-            string contentDisposition = _webClient.ResponseHeaders["Content-Disposition"] ?? string.Empty;
-            if (string.IsNullOrEmpty(contentDisposition))
+            ContentDisposition contentDisposition = null;
+            if (_webClient.ResponseHeaders["Content-Disposition"] != null)
             {
-                fileName = Path.GetFileName(_webClient.ResponseUri.LocalPath);
+                contentDisposition = new ContentDisposition(_webClient.ResponseHeaders["Content-Disposition"]);
             }
-            else
-            {
-                fileName = TryToFindFileName(contentDisposition, "filename=");
-                if (string.IsNullOrEmpty(fileName))
-                {
-                    fileName = TryToFindFileName(contentDisposition, "filename*=UTF-8''");
-                }
-            }
+
+            var fileName = string.IsNullOrEmpty(contentDisposition?.FileName)
+                ? Path.GetFileName(_webClient.ResponseUri.LocalPath)
+                : contentDisposition.FileName;
 
             var tempPath =
                 Path.Combine(
@@ -159,12 +166,14 @@ namespace AutoUpdaterDotNET
                 return;
             }
 
+            AutoUpdater.InstallerArgs = AutoUpdater.InstallerArgs.Replace("%path%",
+                Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName));
+
             var processStartInfo = new ProcessStartInfo
             {
                 FileName = tempPath,
                 UseShellExecute = true,
-                Arguments = AutoUpdater.InstallerArgs.Replace("%path%",
-                    Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName))
+                Arguments = AutoUpdater.InstallerArgs
             };
 
             var extension = Path.GetExtension(tempPath);
@@ -246,28 +255,6 @@ namespace AutoUpdaterDotNET
             int place = Convert.ToInt32(Math.Floor(Math.Log(bytes, 1024)));
             double num = Math.Round(bytes / Math.Pow(1024, place), 1);
             return $"{(Math.Sign(byteCount) * num).ToString(CultureInfo.InvariantCulture)} {suf[place]}";
-        }
-
-        private static string TryToFindFileName(string contentDisposition, string lookForFileName)
-        {
-            string fileName = String.Empty;
-            if (!string.IsNullOrEmpty(contentDisposition))
-            {
-                var index = contentDisposition.IndexOf(lookForFileName, StringComparison.CurrentCultureIgnoreCase);
-                if (index >= 0)
-                    fileName = contentDisposition.Substring(index + lookForFileName.Length);
-                if (fileName.StartsWith("\""))
-                {
-                    var file = fileName.Substring(1, fileName.Length - 1);
-                    var i = file.IndexOf("\"", StringComparison.CurrentCultureIgnoreCase);
-                    if (i != -1)
-                    {
-                        fileName = file.Substring(0, i);
-                    }
-                }
-            }
-
-            return fileName;
         }
 
         private static bool CompareChecksum(string fileName, string checksum)
